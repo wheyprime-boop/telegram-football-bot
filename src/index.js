@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import telegramService from './services/telegram.js';
-import realDataProvider from './services/real-data-provider.js';
+import professionalProvider from './services/professional-provider.js';
 import statisticsService from './services/statistics.js';
 import realtimeMonitorService from './services/realtime-monitor.js';
 
@@ -28,7 +28,7 @@ function validateEnvironment() {
 /**
  * Executar envio de previsões consolidadas
  */
-async function sendDailyPredictions(timeOfDay = 'morning', sendAll = false, realDataOnly = false) {
+async function sendDailyPredictions(timeOfDay = 'morning') {
   const timeLabels = {
     'morning': '7h da manhã',
     'afternoon': '12h do meio-dia',
@@ -36,25 +36,11 @@ async function sendDailyPredictions(timeOfDay = 'morning', sendAll = false, real
   };
 
   console.log(`\n📅 Executando envio de previsões (${timeLabels[timeOfDay]}) às ${new Date().toLocaleTimeString('pt-PT')}`);
-  if (sendAll) {
-    console.log('📊 Modo: TODAS as previsões');
-  }
-  if (realDataOnly) {
-    console.log('🔴 Modo: Apenas dados reais (sem fallback)');
-  }
 
   try {
     // Obter previsões consolidadas
     console.log('🔄 Recolhendo previsões...');
-    let predictions;
-    
-    if (realDataOnly) {
-      predictions = await realDataProvider.getRealDataOnly();
-    } else if (sendAll) {
-      predictions = await realDataProvider.getAllPredictionsUnfiltered();
-    } else {
-      predictions = await realDataProvider.getPredictions();
-    }
+    const predictions = await professionalProvider.getAllGamesAndPredictions();
 
     if (!predictions || predictions.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
@@ -66,18 +52,8 @@ async function sendDailyPredictions(timeOfDay = 'morning', sendAll = false, real
       return;
     }
 
-    // Determinar formato baseado na hora do dia e modo
-    let message;
-    if (sendAll) {
-      // Enviar TODAS as previsões com análise completa
-      message = realDataProvider.formatAllPredictionsMessage(predictions);
-    } else if (timeOfDay === 'morning') {
-      // Manhã: Top 5
-      message = realDataProvider.formatTop5Message(predictions);
-    } else {
-      // Tarde/Noite: Completo
-      message = realDataProvider.formatFullMessage(predictions);
-    }
+    // Formatar mensagem profissional
+    const message = professionalProvider.formatProfessionalMessage(predictions);
 
     if (message) {
       console.log('📤 Enviando previsões...');
@@ -147,37 +123,25 @@ async function initialize() {
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
 
-  // TESTE: 17:50 hoje (apenas para teste - TODAS as previsões, dados reais apenas)
-  const now = new Date();
-  const testTime = new Date();
-  testTime.setHours(17, 50, 0, 0);
-  
-  if (now < testTime) {
-    const timeUntilTest = testTime - now;
-    console.log(`   🧪 TESTE: 17:50 - Envio de TODAS as previsões (dados reais apenas) (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
-    setTimeout(() => {
-      console.log('\n🧪 EXECUTANDO TESTE ÀS 17:50 - ENVIANDO TODAS AS PREVISÕES (DADOS REAIS)...');
-      sendDailyPredictions('afternoon', true, true);
-    }, timeUntilTest);
-  }
+  // Sem testes - horários normais apenas
 
-  // 7 da manhã - Top 5
+  // 7 da manhã - Previsões Profissionais
   cron.schedule('00 07 * * *', () => sendDailyPredictions('morning'), {
     timezone: timezone
   });
-  console.log('   ✅ 07:00 - Top 5 Melhores Previsões');
+  console.log('   ✅ 07:00 - Previsões Profissionais');
 
   // 12 do meio-dia - Completo
   cron.schedule('00 12 * * *', () => sendDailyPredictions('afternoon'), {
     timezone: timezone
   });
-  console.log('   ✅ 12:00 - Previsões Completas');
+  console.log('   ✅ 12:00 - Previsões Profissionais');
 
   // 17 da tarde - Completo
   cron.schedule('00 17 * * *', () => sendDailyPredictions('evening'), {
     timezone: timezone
   });
-  console.log('   ✅ 17:00 - Previsões Completas');
+  console.log('   ✅ 17:00 - Previsões Profissionais');
 
   // Relatório de estatísticas - Diariamente às 20h
   cron.schedule('00 20 * * *', sendStatisticsReport, {
