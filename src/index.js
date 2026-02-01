@@ -130,6 +130,20 @@ async function initialize() {
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
 
+  // TESTE: 11:40 hoje (apenas para teste)
+  const now = new Date();
+  const testTime = new Date();
+  testTime.setHours(11, 40, 0, 0);
+  
+  if (now < testTime) {
+    const timeUntilTest = testTime - now;
+    console.log(`   🧪 TESTE: 11:40 - Envio de teste (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
+    setTimeout(() => {
+      console.log('\n🧪 EXECUTANDO TESTE ÀS 11:40...');
+      sendDailyPredictions('morning');
+    }, timeUntilTest);
+  }
+
   // 7 da manhã - Top 5
   cron.schedule('00 07 * * *', () => sendDailyPredictions('morning'), {
     timezone: timezone
@@ -159,9 +173,6 @@ async function initialize() {
 
   console.log('\n✅ Bot iniciado com sucesso!');
   console.log('📌 O bot está a aguardar a próxima execução...\n');
-
-  // Opcional: enviar previsões imediatamente para teste (descomenta se quiseres)
-  // await sendDailyPredictions('morning');
 }
 
 // Tratamento de erros não capturados
