@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import telegramService from './services/telegram.js';
-import predictionsProvider from './services/predictions-provider.js';
+import realDataProvider from './services/real-data-provider.js';
 import statisticsService from './services/statistics.js';
 import realtimeMonitorService from './services/realtime-monitor.js';
 
@@ -40,7 +40,7 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
   try {
     // Obter previsões consolidadas
     console.log('🔄 Recolhendo previsões...');
-    const predictions = await predictionsProvider.getPredictions();
+    const predictions = await realDataProvider.getPredictions();
 
     if (!predictions || predictions.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
@@ -56,10 +56,10 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
     let message;
     if (timeOfDay === 'morning') {
       // Manhã: Top 5
-      message = predictionsProvider.formatTop5Message(predictions);
+      message = realDataProvider.formatTop5Message(predictions);
     } else {
       // Tarde/Noite: Completo
-      message = predictionsProvider.formatFullMessage(predictions);
+      message = realDataProvider.formatFullMessage(predictions);
     }
 
     if (message) {
