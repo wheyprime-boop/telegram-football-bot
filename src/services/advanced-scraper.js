@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import statisticsService from './statistics.js';
 
 /**
  * Serviço Avançado de Web Scraping com Consolidação de Previsões
@@ -10,6 +11,7 @@ class AdvancedScraperService {
     this.headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     };
+    this.qualityThreshold = 65; // Mínimo de confiança
   }
 
   /**
@@ -175,7 +177,10 @@ class AdvancedScraperService {
       return this.analyzeMatch(match);
     });
 
-    return consolidatedMatches.sort((a, b) => b.confidence - a.confidence);
+    // Ordenar por confiança e filtrar por qualidade
+    return consolidatedMatches
+      .filter(m => m.confidence >= this.qualityThreshold)
+      .sort((a, b) => b.confidence - a.confidence);
   }
 
   /**
@@ -323,7 +328,7 @@ class AdvancedScraperService {
 
       // Consolidar e analisar
       const consolidated = this.consolidatePredictions(allPredictions);
-      console.log(`✅ Jogos consolidados: ${consolidated.length}`);
+      console.log(`✅ Jogos consolidados (filtrados): ${consolidated.length}`);
 
       return consolidated;
     } catch (error) {
@@ -333,7 +338,42 @@ class AdvancedScraperService {
   }
 
   /**
-   * Formatar previsões consolidadas para mensagem do Telegram
+   * Formatar Top 5 previsões para mensagem do Telegram
+   */
+  formatTop5Message(consolidatedMatches) {
+    if (consolidatedMatches.length === 0) {
+      return null;
+    }
+
+    const top5 = consolidatedMatches.slice(0, 5);
+    let message = `🏆 <b>TOP 5 MELHORES PREVISÕES - ${new Date().toLocaleDateString('pt-PT')}</b>\n`;
+    message += `⭐ Filtradas por confiança (mínimo ${this.qualityThreshold}%)\n\n`;
+    message += `${'═'.repeat(50)}\n\n`;
+
+    for (let i = 0; i < top5.length; i++) {
+      const match = top5[i];
+      const medal = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][i];
+
+      message += `${medal} <b>${i + 1}. ${match.homeTeam} vs ${match.awayTeam}</b>\n`;
+      message += `🎯 Previsão: <b>${match.bestPrediction}</b>\n`;
+      message += `📈 Confiança: <b>${match.confidence}%</b>\n`;
+      message += `🤝 Acordo: ${match.agreementPercentage}%\n`;
+      message += `📍 Fontes: ${match.sourceCount}\n\n`;
+    }
+
+    message += `${'═'.repeat(50)}\n\n`;
+    message += `📊 <b>Estatísticas:</b>\n`;
+    message += `   Total de Jogos: ${consolidatedMatches.length}\n`;
+    message += `   Confiança Média: ${Math.round(consolidatedMatches.reduce((a, b) => a + b.confidence, 0) / consolidatedMatches.length)}%\n`;
+    message += `\n📍 <b>Fontes:</b> Forebet, Betbrain, eScored\n`;
+    message += `\n💡 <i>Apenas previsões com alta confiabilidade são mostradas.</i>\n`;
+    message += `<i>Joga com responsabilidade!</i>`;
+
+    return message;
+  }
+
+  /**
+   * Formatar previsões consolidadas completas para mensagem do Telegram
    */
   formatConsolidatedMessage(consolidatedMatches) {
     if (consolidatedMatches.length === 0) {
@@ -341,7 +381,8 @@ class AdvancedScraperService {
     }
 
     let message = `🏆 <b>PREVISÕES CONSOLIDADAS - ${new Date().toLocaleDateString('pt-PT')}</b>\n`;
-    message += `📊 Análise de múltiplas fontes especializadas\n\n`;
+    message += `📊 Análise de múltiplas fontes especializadas\n`;
+    message += `⭐ Filtradas por confiança (mínimo ${this.qualityThreshold}%)\n\n`;
     message += `${'═'.repeat(50)}\n\n`;
 
     let matchCount = 0;
