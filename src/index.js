@@ -147,16 +147,16 @@ async function initialize() {
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
 
-  // TESTE: 12:55 hoje (apenas para teste - TODAS as previsões, dados reais apenas)
+  // TESTE: 17:50 hoje (apenas para teste - TODAS as previsões, dados reais apenas)
   const now = new Date();
   const testTime = new Date();
-  testTime.setHours(12, 55, 0, 0);
+  testTime.setHours(17, 50, 0, 0);
   
   if (now < testTime) {
     const timeUntilTest = testTime - now;
-    console.log(`   🧪 TESTE: 12:55 - Envio de TODAS as previsões (dados reais apenas) (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
+    console.log(`   🧪 TESTE: 17:50 - Envio de TODAS as previsões (dados reais apenas) (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
     setTimeout(() => {
-      console.log('\n🧪 EXECUTANDO TESTE ÀS 12:55 - ENVIANDO TODAS AS PREVISÕES (DADOS REAIS)...');
+      console.log('\n🧪 EXECUTANDO TESTE ÀS 17:50 - ENVIANDO TODAS AS PREVISÕES (DADOS REAIS)...');
       sendDailyPredictions('afternoon', true, true);
     }, timeUntilTest);
   }
