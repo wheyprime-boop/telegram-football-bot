@@ -480,6 +480,149 @@ class RealDataProviderService {
   }
 
   /**
+   * Obter apenas dados reais (sem fallback)
+   */
+  async getRealDataOnly() {
+    try {
+      console.log('\n🔄 Recolhendo apenas dados reais (sem fallback)...\n');
+
+      // Recolher dados de todas as fontes em paralelo
+      const [oddsData, footballData, sofaScoreData] = await Promise.all([
+        this.getOddsDataRealOnly(),
+        this.getFootballDataMatchesRealOnly(),
+        this.getSofaScoreDataRealOnly()
+      ]);
+
+      // Consolidar dados
+      const consolidated = this.consolidateMatches(oddsData, footballData, sofaScoreData);
+      
+      console.log(`\n✅ Total de previsões consolidadas (dados reais): ${consolidated.length}\n`);
+      
+      return consolidated.sort((a, b) => b.confidence - a.confidence);
+    } catch (error) {
+      console.error('❌ Erro ao recolher previsões:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Obter dados de The Odds API (sem fallback)
+   */
+  async getOddsDataRealOnly() {
+    try {
+      console.log('📊 Recolhendo odds de The Odds API (sem fallback)...');
+      
+      const response = await axios.get('https://api.the-odds-api.com/v4/sports/soccer_epl/events', {
+        params: {
+          apiKey: this.oddsApiKey,
+          limit: 50
+        },
+        timeout: 10000
+      });
+
+      const matches = response.data.data || [];
+      
+      if (!matches || matches.length === 0) {
+        console.log('⚠️ The Odds API retornou dados vazios');
+        return [];
+      }
+
+      console.log(`✅ Obtidas ${matches.length} odds de The Odds API`);
+      
+      return matches.map(match => ({
+        source: 'The Odds API',
+        homeTeam: match.home_team,
+        awayTeam: match.away_team,
+        league: 'Premier League',
+        commenceTime: match.commence_time,
+        bookmakers: match.bookmakers || [],
+        odds: this.extractOdds(match.bookmakers)
+      }));
+    } catch (error) {
+      console.error('❌ Erro ao recolher dados de The Odds API:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Obter dados de football-data.org (sem fallback)
+   */
+  async getFootballDataMatchesRealOnly() {
+    try {
+      console.log('📊 Recolhendo dados de football-data.org (sem fallback)...');
+      
+      const response = await axios.get('https://api.football-data.org/v4/competitions/PL/matches', {
+        headers: {
+          'X-Auth-Token': this.footballDataToken
+        },
+        params: {
+          status: 'SCHEDULED',
+          limit: 50
+        },
+        timeout: 10000
+      });
+
+      const matches = response.data.matches || [];
+      
+      if (!matches || matches.length === 0) {
+        console.log('⚠️ football-data.org retornou dados vazios');
+        return [];
+      }
+
+      console.log(`✅ Obtidas ${matches.length} previsões de football-data.org`);
+      
+      return matches.map(match => ({
+        source: 'football-data.org',
+        homeTeam: match.homeTeam.name,
+        awayTeam: match.awayTeam.name,
+        league: 'Premier League',
+        utcDate: match.utcDate,
+        status: match.status,
+        odds: match.odds
+      }));
+    } catch (error) {
+      console.error('❌ Erro ao recolher dados de football-data.org:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Obter dados de SofaScore (sem fallback)
+   */
+  async getSofaScoreDataRealOnly() {
+    try {
+      console.log('📊 Recolhendo dados de SofaScore (sem fallback)...');
+      
+      const response = await axios.get('https://api.sofascore.com/api/v1/sport/football/events/today', {
+        timeout: 10000,
+        headers: this.headers
+      });
+
+      const events = response.data.events || [];
+      
+      if (!events || events.length === 0) {
+        console.log('⚠️ SofaScore retornou dados vazios');
+        return [];
+      }
+
+      console.log(`✅ Obtidas ${events.length} previsões de SofaScore`);
+      
+      return events.map(event => ({
+        source: 'SofaScore',
+        homeTeam: event.homeTeam.name,
+        awayTeam: event.awayTeam.name,
+        league: event.tournament.name,
+        startTimestamp: event.startTimestamp,
+        rating: event.homeTeam.rating || 0,
+        predictions: event.predictions || {}
+      }));
+    } catch (error) {
+      console.error('❌ Erro ao recolher dados de SofaScore:', error.message);
+      return [];
+    }
+  }
+
+  /**
    * Obter TODAS as previsões sem filtro de qualidade
    */
   async getAllPredictionsUnfiltered() {

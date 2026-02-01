@@ -28,7 +28,7 @@ function validateEnvironment() {
 /**
  * Executar envio de previsões consolidadas
  */
-async function sendDailyPredictions(timeOfDay = 'morning', sendAll = false) {
+async function sendDailyPredictions(timeOfDay = 'morning', sendAll = false, realDataOnly = false) {
   const timeLabels = {
     'morning': '7h da manhã',
     'afternoon': '12h do meio-dia',
@@ -37,25 +37,30 @@ async function sendDailyPredictions(timeOfDay = 'morning', sendAll = false) {
 
   console.log(`\n📅 Executando envio de previsões (${timeLabels[timeOfDay]}) às ${new Date().toLocaleTimeString('pt-PT')}`);
   if (sendAll) {
-    console.log('📊 Modo: TODAS as previsões (sem filtro de qualidade)');
+    console.log('📊 Modo: TODAS as previsões');
+  }
+  if (realDataOnly) {
+    console.log('🔴 Modo: Apenas dados reais (sem fallback)');
   }
 
   try {
     // Obter previsões consolidadas
     console.log('🔄 Recolhendo previsões...');
-    let predictions = await realDataProvider.getPredictions();
-
-    // Se sendAll=true, remover filtro de qualidade e enviar TODAS
-    if (sendAll) {
-      console.log('📊 Removendo filtro de qualidade para enviar TODAS as previsões...');
+    let predictions;
+    
+    if (realDataOnly) {
+      predictions = await realDataProvider.getRealDataOnly();
+    } else if (sendAll) {
       predictions = await realDataProvider.getAllPredictionsUnfiltered();
+    } else {
+      predictions = await realDataProvider.getPredictions();
     }
 
     if (!predictions || predictions.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
       await telegramService.sendMessage(
         `📅 <b>Previsões Consolidadas - ${new Date().toLocaleDateString('pt-PT')} (${timeLabels[timeOfDay]})</b>\n\n` +
-        `⚠️ Sem previsões disponíveis para hoje.\n\n` +
+        `⚠️ Sem previsões reais disponíveis para hoje.\n\n` +
         `Volte mais tarde para novas previsões!`
       );
       return;
@@ -142,17 +147,17 @@ async function initialize() {
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
 
-  // TESTE: 12:40 hoje (apenas para teste - TODAS as previsões)
+  // TESTE: 12:55 hoje (apenas para teste - TODAS as previsões, dados reais apenas)
   const now = new Date();
   const testTime = new Date();
-  testTime.setHours(12, 40, 0, 0);
+  testTime.setHours(12, 55, 0, 0);
   
   if (now < testTime) {
     const timeUntilTest = testTime - now;
-    console.log(`   🧪 TESTE: 12:40 - Envio de TODAS as previsões (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
+    console.log(`   🧪 TESTE: 12:55 - Envio de TODAS as previsões (dados reais apenas) (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
     setTimeout(() => {
-      console.log('\n🧪 EXECUTANDO TESTE ÀS 12:40 - ENVIANDO TODAS AS PREVISÕES...');
-      sendDailyPredictions('afternoon', true);
+      console.log('\n🧪 EXECUTANDO TESTE ÀS 12:55 - ENVIANDO TODAS AS PREVISÕES (DADOS REAIS)...');
+      sendDailyPredictions('afternoon', true, true);
     }, timeUntilTest);
   }
 
