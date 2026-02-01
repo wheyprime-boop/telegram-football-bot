@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import telegramService from './services/telegram.js';
-import professionalProvider from './services/professional-provider.js';
+import rssPredictionsProvider from './services/rss-predictions-provider.js';
 import statisticsService from './services/statistics.js';
 import realtimeMonitorService from './services/realtime-monitor.js';
 
@@ -40,7 +40,7 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
   try {
     // Obter previsões consolidadas
     console.log('🔄 Recolhendo previsões...');
-    const predictions = await professionalProvider.getAllGamesAndPredictions();
+    const predictions = await rssPredictionsProvider.getAllGamesWithPredictions();
 
     if (!predictions || predictions.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
@@ -53,7 +53,7 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
     }
 
     // Formatar mensagem profissional
-    const message = professionalProvider.formatProfessionalMessage(predictions);
+    const message = rssPredictionsProvider.formatMessage(predictions);
 
     if (message) {
       console.log('📤 Enviando previsões...');
@@ -123,22 +123,22 @@ async function initialize() {
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
 
-  // TESTE: 20:45 hoje (previsões de amanhã)
+  // TESTE: 21:00 hoje (previsões de hoje com RSS Feeds)
   const now = new Date();
   const testTime = new Date();
-  testTime.setHours(20, 45, 0, 0);
+  testTime.setHours(21, 0, 0, 0);
   
   if (now < testTime) {
     const timeUntilTest = testTime - now;
-    console.log(`   🧪 TESTE: 20:45 - Previsões de amanhã`);
+    console.log(`   🧪 TESTE: 21:00 - Previsões Reais com RSS Feeds`);
     setTimeout(async () => {
-      console.log('\n🧪 EXECUTANDO TESTE ÀS 20:45...');
+      console.log('\n🧪 EXECUTANDO TESTE ÀS 21:00...');
       try {
-        const predictions = await professionalProvider.getAllGamesAndPredictionsTomorrow();
+        const predictions = await rssPredictionsProvider.getAllGamesWithPredictions();
         if (!predictions || predictions.length === 0) {
-          await telegramService.sendMessage('Sem previsões para amanhã');
+          await telegramService.sendMessage('Sem previsões disponíveis');
         } else {
-          const message = professionalProvider.formatProfessionalMessageTomorrow(predictions);
+          const message = rssPredictionsProvider.formatMessage(predictions);
           await telegramService.sendLongMessage(message);
         }
       } catch (error) {
