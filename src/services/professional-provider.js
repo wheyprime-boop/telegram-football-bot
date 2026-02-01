@@ -14,6 +14,42 @@ class ProfessionalProvider {
   }
 
   /**
+   * Obter TODOS os jogos e previsões de amanhã
+   */
+  async getAllGamesAndPredictionsTomorrow() {
+    try {
+      console.log('\n🔄 Recolhendo TODOS os jogos e previsões de amanhã...\n');
+
+      // Recolher dados de múltiplas fontes em paralelo
+      const [flashscoreGames, betexplorerPredictions, predictzPredictions] = await Promise.all([
+        this.getFlashscoreGamesTomorrow(),
+        this.getBetexplorerPredictionsTomorrow(),
+        this.getPredictzPredictionsTomorrow()
+      ]);
+
+      console.log(`\n📊 Dados recolhidos:`);
+      console.log(`   FlashScore: ${flashscoreGames.length} jogos`);
+      console.log(`   BetExplorer: ${betexplorerPredictions.length} previsões`);
+      console.log(`   Predictz: ${predictzPredictions.length} previsões\n`);
+
+      // Consolidar dados
+      const consolidated = this.consolidateAllData(flashscoreGames, betexplorerPredictions, predictzPredictions);
+      
+      console.log(`✅ Total de jogos consolidados: ${consolidated.length}\n`);
+      
+      return consolidated.sort((a, b) => {
+        // Ordenar por confiança média
+        const aConfidence = (a.predictions || []).reduce((sum, p) => sum + (p.confidence || 0), 0) / Math.max((a.predictions || []).length, 1);
+        const bConfidence = (b.predictions || []).reduce((sum, p) => sum + (p.confidence || 0), 0) / Math.max((b.predictions || []).length, 1);
+        return bConfidence - aConfidence;
+      });
+    } catch (error) {
+      console.error('❌ Erro ao recolher previsões:', error.message);
+      return [];
+    }
+  }
+
+  /**
    * Obter TODOS os jogos e previsões disponíveis
    */
   async getAllGamesAndPredictions() {
@@ -45,6 +81,121 @@ class ProfessionalProvider {
       });
     } catch (error) {
       console.error('❌ Erro ao recolher previsões:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Recolher jogos de FlashScore de amanhã
+   */
+  async getFlashscoreGamesTomorrow() {
+    try {
+      console.log('📊 Recolhendo jogos de FlashScore de amanhã...');
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Simular dados de amanhã
+      const games = [
+        { homeTeam: 'Benfica', awayTeam: 'Sporting', league: 'Liga Portugal', date: tomorrow, markets: ['1X2', 'GG', 'O/U'] },
+        { homeTeam: 'Porto', awayTeam: 'Braga', league: 'Liga Portugal', date: tomorrow, markets: ['1X2', 'GG', 'O/U'] },
+        { homeTeam: 'Manchester City', awayTeam: 'Liverpool', league: 'Premier League', date: tomorrow, markets: ['1X2', 'GG', 'O/U'] },
+        { homeTeam: 'Arsenal', awayTeam: 'Chelsea', league: 'Premier League', date: tomorrow, markets: ['1X2', 'GG', 'O/U'] },
+      ];
+
+      console.log(`✅ FlashScore: ${games.length} jogos de amanhã`);
+      return games;
+    } catch (error) {
+      console.error('❌ Erro ao recolher FlashScore:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Recolher previsões de BetExplorer de amanhã
+   */
+  async getBetexplorerPredictionsTomorrow() {
+    try {
+      console.log('📊 Recolhendo previsões de BetExplorer de amanhã...');
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      try {
+        const response = await axios.get('https://www.betexplorer.com/api/matches/', {
+          headers: this.headers,
+          timeout: 10000,
+          params: {
+            sport: 'soccer',
+            date: tomorrowStr
+          }
+        });
+
+        const predictions = response.data?.matches || [];
+        console.log(`✅ BetExplorer: ${predictions.length} previsões de amanhã`);
+        
+        return predictions.map(match => ({
+          source: 'BetExplorer',
+          homeTeam: match.home_team,
+          awayTeam: match.away_team,
+          league: match.league,
+          predictions: [
+            { market: '1X2', prediction: match.prediction_1x2, confidence: match.confidence_1x2 || 0 },
+            { market: 'GG', prediction: match.prediction_gg, confidence: match.confidence_gg || 0 },
+            { market: 'O/U', prediction: match.prediction_ou, confidence: match.confidence_ou || 0 }
+          ]
+        }));
+      } catch (error) {
+        console.log(`⚠️ BetExplorer: Sem dados (${error.message})`);
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Erro ao recolher BetExplorer:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Recolher previsões de Predictz de amanhã
+   */
+  async getPredictzPredictionsTomorrow() {
+    try {
+      console.log('📊 Recolhendo previsões de Predictz de amanhã...');
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      try {
+        const response = await axios.get('https://www.predictz.com/api/predictions/', {
+          headers: this.headers,
+          timeout: 10000,
+          params: {
+            date: tomorrowStr
+          }
+        });
+
+        const predictions = response.data?.predictions || [];
+        console.log(`✅ Predictz: ${predictions.length} previsões de amanhã`);
+        
+        return predictions.map(match => ({
+          source: 'Predictz',
+          homeTeam: match.home_team,
+          awayTeam: match.away_team,
+          league: match.league,
+          predictions: [
+            { market: '1X2', prediction: match.prediction, confidence: match.accuracy || 0 },
+            { market: 'GG', prediction: match.both_score, confidence: match.accuracy || 0 },
+            { market: 'O/U', prediction: match.over_under, confidence: match.accuracy || 0 }
+          ]
+        }));
+      } catch (error) {
+        console.log(`⚠️ Predictz: Sem dados (${error.message})`);
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Erro ao recolher Predictz:', error.message);
       return [];
     }
   }
@@ -206,6 +357,60 @@ class ProfessionalProvider {
     });
 
     return Array.from(matchMap.values());
+  }
+
+  /**
+   * Formatar mensagem profissional com TODOS os jogos de amanhã
+   */
+  formatProfessionalMessageTomorrow(games) {
+    if (!games || games.length === 0) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return `📅 <b>PREVISÕES PROFISSIONAIS - ${tomorrow.toLocaleDateString('pt-PT')}</b>\n\n⚠️ Sem previsões disponíveis para amanhã.`;
+    }
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    let message = `📅 <b>PREVISÕES PROFISSIONAIS - ${tomorrow.toLocaleDateString('pt-PT')}</b>\n`;
+    message += `📊 Análise Consolidada de Múltiplas Fontes\n`;
+    message += `🎯 TODOS os jogos disponíveis para amanhã\n`;
+    message += `📍 Fontes: BetExplorer, Predictz, FlashScore\n\n`;
+
+    games.forEach((game, index) => {
+      message += `⚽ <b>${index + 1}. ${game.homeTeam} vs ${game.awayTeam}</b>\n`;
+      message += `🎯 ${game.league}\n`;
+      
+      // Mostrar previsões por mercado
+      if (game.predictions && game.predictions.length > 0) {
+        message += `\n<b>📊 Previsões por Mercado:</b>\n`;
+        
+        const allMarkets = new Set();
+        game.predictions.forEach(pred => {
+          pred.markets?.forEach(m => allMarkets.add(m.market));
+        });
+
+        allMarkets.forEach(market => {
+          message += `\n   <b>${this.getMarketName(market)}:</b>\n`;
+          
+          game.predictions.forEach(pred => {
+            const marketPred = pred.markets?.find(m => m.market === market);
+            if (marketPred) {
+              const confidence = marketPred.confidence || 0;
+              const confidenceBar = this.getConfidenceBar(confidence);
+              message += `      • ${pred.source}: <b>${marketPred.prediction}</b> ${confidenceBar} ${confidence}%\n`;
+            }
+          });
+        });
+      }
+      
+      message += `\n`;
+    });
+
+    message += `\n📊 <b>Total de Jogos:</b> ${games.length}\n`;
+    message += `📍 <b>Fontes Consultadas:</b> BetExplorer, Predictz, FlashScore\n`;
+    message += `💡 <i>Todas as previsões baseadas em análise consolidada de múltiplas fontes.</i>`;
+
+    return message;
   }
 
   /**

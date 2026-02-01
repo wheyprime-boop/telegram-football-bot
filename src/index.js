@@ -123,7 +123,29 @@ async function initialize() {
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
 
-  // Sem testes - horários normais apenas
+  // TESTE: 20:45 hoje (previsões de amanhã)
+  const now = new Date();
+  const testTime = new Date();
+  testTime.setHours(20, 45, 0, 0);
+  
+  if (now < testTime) {
+    const timeUntilTest = testTime - now;
+    console.log(`   🧪 TESTE: 20:45 - Previsões de amanhã`);
+    setTimeout(async () => {
+      console.log('\n🧪 EXECUTANDO TESTE ÀS 20:45...');
+      try {
+        const predictions = await professionalProvider.getAllGamesAndPredictionsTomorrow();
+        if (!predictions || predictions.length === 0) {
+          await telegramService.sendMessage('Sem previsões para amanhã');
+        } else {
+          const message = professionalProvider.formatProfessionalMessageTomorrow(predictions);
+          await telegramService.sendLongMessage(message);
+        }
+      } catch (error) {
+        console.error('Erro:', error.message);
+      }
+    }, timeUntilTest);
+  }
 
   // 7 da manhã - Previsões Profissionais
   cron.schedule('00 07 * * *', () => sendDailyPredictions('morning'), {
