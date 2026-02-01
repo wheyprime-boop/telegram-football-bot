@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import telegramService from './services/telegram.js';
-import advancedScraperService from './services/advanced-scraper.js';
+import predictionsProvider from './services/predictions-provider.js';
 import statisticsService from './services/statistics.js';
 import realtimeMonitorService from './services/realtime-monitor.js';
 
@@ -38,11 +38,11 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
   console.log(`\n📅 Executando envio de previsões (${timeLabels[timeOfDay]}) às ${new Date().toLocaleTimeString('pt-PT')}`);
 
   try {
-    // Obter previsões consolidadas de múltiplas fontes
-    console.log('🔄 Recolhendo e consolidando previsões...');
-    const consolidatedMatches = await advancedScraperService.getAllPredictions();
+    // Obter previsões consolidadas
+    console.log('🔄 Recolhendo previsões...');
+    const predictions = await predictionsProvider.getPredictions();
 
-    if (!consolidatedMatches || consolidatedMatches.length === 0) {
+    if (!predictions || predictions.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
       await telegramService.sendMessage(
         `📅 <b>Previsões Consolidadas - ${new Date().toLocaleDateString('pt-PT')} (${timeLabels[timeOfDay]})</b>\n\n` +
@@ -56,10 +56,10 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
     let message;
     if (timeOfDay === 'morning') {
       // Manhã: Top 5
-      message = advancedScraperService.formatTop5Message(consolidatedMatches);
+      message = predictionsProvider.formatTop5Message(predictions);
     } else {
       // Tarde/Noite: Completo
-      message = advancedScraperService.formatConsolidatedMessage(consolidatedMatches);
+      message = predictionsProvider.formatFullMessage(predictions);
     }
 
     if (message) {
@@ -68,7 +68,7 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
       console.log('✅ Previsões enviadas com sucesso!');
 
       // Registar previsões
-      for (const match of consolidatedMatches.slice(0, 5)) {
+      for (const match of predictions.slice(0, 5)) {
         statisticsService.recordPrediction({
           match: `${match.homeTeam} vs ${match.awayTeam}`,
           prediction: match.bestPrediction,
