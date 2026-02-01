@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import telegramService from './services/telegram.js';
-import scraperService from './services/scraper.js';
+import advancedScraperService from './services/advanced-scraper.js';
 
 /**
- * Bot de Telegram para enviar previsões de futebol diárias
+ * Bot de Telegram para enviar previsões de futebol diárias consolidadas
  */
 
 // Validar variáveis de ambiente
@@ -23,20 +23,20 @@ function validateEnvironment() {
 }
 
 /**
- * Executar envio de previsões
+ * Executar envio de previsões consolidadas
  */
 async function sendDailyPredictions() {
-  console.log(`\n📅 Executando envio de previsões às ${new Date().toLocaleTimeString('pt-PT')}`);
+  console.log(`\n📅 Executando envio de previsões consolidadas às ${new Date().toLocaleTimeString('pt-PT')}`);
 
   try {
-    // Obter previsões de múltiplas fontes
-    console.log('🔄 Recolhendo previsões de múltiplas fontes...');
-    const predictions = await scraperService.getAllPredictions();
+    // Obter previsões consolidadas de múltiplas fontes
+    console.log('🔄 Recolhendo e consolidando previsões...');
+    const consolidatedMatches = await advancedScraperService.getAllPredictions();
 
-    if (!predictions || predictions.length === 0) {
+    if (!consolidatedMatches || consolidatedMatches.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
       await telegramService.sendMessage(
-        `📅 <b>Previsões de Futebol - ${new Date().toLocaleDateString('pt-PT')}</b>\n\n` +
+        `📅 <b>Previsões Consolidadas - ${new Date().toLocaleDateString('pt-PT')}</b>\n\n` +
         `⚠️ Sem previsões disponíveis para hoje.\n\n` +
         `Volte amanhã para novas previsões!`
       );
@@ -44,12 +44,12 @@ async function sendDailyPredictions() {
     }
 
     // Formatar e enviar previsões
-    console.log('📤 Formatando e enviando previsões...');
-    const message = scraperService.formatPredictionsMessage(predictions);
+    console.log('📤 Formatando e enviando previsões consolidadas...');
+    const message = advancedScraperService.formatConsolidatedMessage(consolidatedMatches);
     
     if (message) {
       await telegramService.sendLongMessage(message);
-      console.log('✅ Previsões enviadas com sucesso!');
+      console.log('✅ Previsões consolidadas enviadas com sucesso!');
     } else {
       console.log('⚠️ Nenhuma previsão para enviar');
     }
@@ -67,7 +67,7 @@ async function sendDailyPredictions() {
  * Inicializar bot
  */
 async function initialize() {
-  console.log('🚀 Iniciando Bot de Previsões de Futebol...\n');
+  console.log('🚀 Iniciando Bot de Previsões Consolidadas de Futebol...\n');
 
   // Validar ambiente
   validateEnvironment();
