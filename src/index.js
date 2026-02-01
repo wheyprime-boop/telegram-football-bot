@@ -28,7 +28,7 @@ function validateEnvironment() {
 /**
  * Executar envio de previsões consolidadas
  */
-async function sendDailyPredictions(timeOfDay = 'morning') {
+async function sendDailyPredictions(timeOfDay = 'morning', sendAll = false) {
   const timeLabels = {
     'morning': '7h da manhã',
     'afternoon': '12h do meio-dia',
@@ -36,11 +36,20 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
   };
 
   console.log(`\n📅 Executando envio de previsões (${timeLabels[timeOfDay]}) às ${new Date().toLocaleTimeString('pt-PT')}`);
+  if (sendAll) {
+    console.log('📊 Modo: TODAS as previsões (sem filtro de qualidade)');
+  }
 
   try {
     // Obter previsões consolidadas
     console.log('🔄 Recolhendo previsões...');
-    const predictions = await realDataProvider.getPredictions();
+    let predictions = await realDataProvider.getPredictions();
+
+    // Se sendAll=true, remover filtro de qualidade e enviar TODAS
+    if (sendAll) {
+      console.log('📊 Removendo filtro de qualidade para enviar TODAS as previsões...');
+      predictions = await realDataProvider.getAllPredictionsUnfiltered();
+    }
 
     if (!predictions || predictions.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
@@ -52,9 +61,12 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
       return;
     }
 
-    // Determinar formato baseado na hora do dia
+    // Determinar formato baseado na hora do dia e modo
     let message;
-    if (timeOfDay === 'morning') {
+    if (sendAll) {
+      // Enviar TODAS as previsões com análise completa
+      message = realDataProvider.formatAllPredictionsMessage(predictions);
+    } else if (timeOfDay === 'morning') {
       // Manhã: Top 5
       message = realDataProvider.formatTop5Message(predictions);
     } else {
@@ -130,17 +142,17 @@ async function initialize() {
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
 
-  // TESTE: 11:40 hoje (apenas para teste)
+  // TESTE: 12:40 hoje (apenas para teste - TODAS as previsões)
   const now = new Date();
   const testTime = new Date();
-  testTime.setHours(11, 40, 0, 0);
+  testTime.setHours(12, 40, 0, 0);
   
   if (now < testTime) {
     const timeUntilTest = testTime - now;
-    console.log(`   🧪 TESTE: 11:40 - Envio de teste (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
+    console.log(`   🧪 TESTE: 12:40 - Envio de TODAS as previsões (em ${Math.round(timeUntilTest / 1000 / 60)} minutos)`);
     setTimeout(() => {
-      console.log('\n🧪 EXECUTANDO TESTE ÀS 11:40...');
-      sendDailyPredictions('morning');
+      console.log('\n🧪 EXECUTANDO TESTE ÀS 12:40 - ENVIANDO TODAS AS PREVISÕES...');
+      sendDailyPredictions('afternoon', true);
     }, timeUntilTest);
   }
 

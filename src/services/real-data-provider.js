@@ -372,6 +372,107 @@ class RealDataProviderService {
   }
 
   /**
+   * Obter TODAS as previsões sem filtro de qualidade
+   */
+  async getAllPredictionsUnfiltered() {
+    try {
+      console.log('\n🔄 Recolhendo TODAS as previsões (sem filtro)...\n');
+
+      // Recolher dados de todas as fontes em paralelo
+      const [oddsData, footballData, sofaScoreData] = await Promise.all([
+        this.getOddsData(),
+        this.getFootballDataMatches(),
+        this.getSofaScoreData()
+      ]);
+
+      // Consolidar dados
+      const consolidated = this.consolidateMatches(oddsData, footballData, sofaScoreData);
+      
+      console.log(`\n✅ Total de previsões consolidadas: ${consolidated.length}\n`);
+      
+      return consolidated.sort((a, b) => b.confidence - a.confidence);
+    } catch (error) {
+      console.error('❌ Erro ao recolher previsões:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Formatar TODAS as previsões para Telegram
+   */
+  formatAllPredictionsMessage(predictions) {
+    if (predictions.length === 0) {
+      return null;
+    }
+
+    let message = `🏆 <b>TODAS AS PREVISÕES DE HOJE - ${new Date().toLocaleDateString('pt-PT')}</b>\n`;
+    message += `📊 Análise Completa de Múltiplas Fontes Reais\n`;
+    message += `📍 Fontes: The Odds API, football-data.org, SofaScore\n`;
+    message += `⭐ Sem filtro de qualidade - Todas as previsões disponíveis\n\n`;
+    message += `${'═'.repeat(50)}\n\n`;
+
+    let count = 0;
+    for (const match of predictions) {
+      count++;
+      
+      // Indicador de confiança
+      let confidenceIndicator = '';
+      if (match.confidence >= 75) {
+        confidenceIndicator = '🟢 ALTA';
+      } else if (match.confidence >= 60) {
+        confidenceIndicator = '🟡 MÉDIA';
+      } else {
+        confidenceIndicator = '🔴 BAIXA';
+      }
+
+      message += `⚽ <b>${count}. ${match.homeTeam} vs ${match.awayTeam}</b>\n`;
+      message += `🏆 ${match.league}\n`;
+      message += `🎯 Previsão: <b>${match.bestPrediction}</b>\n`;
+      message += `📈 Confiança: ${match.confidence}% ${confidenceIndicator}\n`;
+      message += `🤝 Acordo entre Fontes: ${match.agreementPercentage}%\n`;
+      message += `📍 Fontes Consultadas: ${match.sourceCount}\n`;
+      message += `\n<b>Análise Detalhada:</b>\n`;
+      
+      for (const source of match.sources) {
+        message += `   • <b>${source.name}:</b> ${source.prediction}\n`;
+      }
+      
+      message += `\n💡 <b>Recomendação:</b> `;
+      if (match.agreementPercentage >= 70 && match.confidence >= 70) {
+        message += `Previsão com <b>alta confiabilidade</b>. Múltiplas fontes concordam.\n`;
+      } else if (match.agreementPercentage >= 50 && match.confidence >= 60) {
+        message += `Previsão <b>moderadamente confiável</b>. Maioria das fontes concorda.\n`;
+      } else {
+        message += `Previsão com <b>confiabilidade limitada</b>. Considerar outras opções.\n`;
+      }
+      
+      message += `\n${'─'.repeat(50)}\n\n`;
+
+      // Limitar a 50 previsões por mensagem (limite do Telegram)
+      if (count >= 50) {
+        message += `\n... e mais ${predictions.length - 50} previsões disponíveis.\n`;
+        break;
+      }
+    }
+
+    message += `\n✅ <b>Total de Jogos Analisados:</b> ${Math.min(count, predictions.length)}\n`;
+    message += `\n📊 <b>Estatísticas Gerais:</b>\n`;
+    
+    const avgConfidence = Math.round(predictions.reduce((a, b) => a + b.confidence, 0) / predictions.length);
+    const avgAgreement = Math.round(predictions.reduce((a, b) => a + b.agreementPercentage, 0) / predictions.length);
+    
+    message += `   Confiança Média: ${avgConfidence}%\n`;
+    message += `   Acordo Médio: ${avgAgreement}%\n`;
+    message += `   Total de Previsões: ${predictions.length}\n`;
+    
+    message += `\n📍 <b>Fontes Principais:</b> The Odds API, football-data.org, SofaScore\n`;
+    message += `\n💡 <i>Estas previsões são baseadas em análise consolidada de múltiplas fontes reais.</i>\n`;
+    message += `<i>Joga com responsabilidade!</i>`;
+
+    return message;
+  }
+
+  /**
    * Formatar previsões completas para Telegram
    */
   formatFullMessage(predictions) {
