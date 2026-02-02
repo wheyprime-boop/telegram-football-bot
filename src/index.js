@@ -1,13 +1,14 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import telegramService from './services/telegram.js';
-import rssPredictionsProvider from './services/rss-predictions-provider.js';
+import consensusProvider from './services/consensus-provider.js';
 import statisticsService from './services/statistics.js';
 import realtimeMonitorService from './services/realtime-monitor.js';
 
 /**
  * Bot de Telegram para enviar previsões de futebol diárias consolidadas
- * Com múltiplos horários, filtros de qualidade e estatísticas
+ * Com consenso de 3 fontes (API-Football, ESPN, FlashScore)
+ * Até 100 jogos por dia
  */
 
 // Validar variáveis de ambiente
@@ -26,7 +27,7 @@ function validateEnvironment() {
 }
 
 /**
- * Executar envio de previsões consolidadas
+ * Executar envio de previsões consolidadas com consenso
  */
 async function sendDailyPredictions(timeOfDay = 'morning') {
   const timeLabels = {
@@ -38,25 +39,25 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
   console.log(`\n📅 Executando envio de previsões (${timeLabels[timeOfDay]}) às ${new Date().toLocaleTimeString('pt-PT')}`);
 
   try {
-    // Obter previsões consolidadas
-    console.log('🔄 Recolhendo previsões...');
-    const predictions = await rssPredictionsProvider.getAllGamesWithPredictions();
+    // Obter previsões com consenso de 3 fontes
+    console.log('🔄 Recolhendo previsões com consenso de 3 fontes...');
+    const predictions = await consensusProvider.getAllGamesWithConsensus();
 
     if (!predictions || predictions.length === 0) {
       console.log('⚠️ Sem previsões disponíveis para hoje');
       await telegramService.sendMessage(
-        `📅 <b>Previsões Consolidadas - ${new Date().toLocaleDateString('pt-PT')} (${timeLabels[timeOfDay]})</b>\n\n` +
+        `📅 <b>Previsões com Consenso - ${new Date().toLocaleDateString('pt-PT')} (${timeLabels[timeOfDay]})</b>\n\n` +
         `⚠️ Sem previsões reais disponíveis para hoje.\n\n` +
         `Volte mais tarde para novas previsões!`
       );
       return;
     }
 
-    // Formatar mensagem profissional
-    const message = rssPredictionsProvider.formatMessage(predictions);
+    // Formatar mensagem com consenso
+    const message = consensusProvider.formatConsensusMessage(predictions);
 
     if (message) {
-      console.log('📤 Enviando previsões...');
+      console.log('📤 Enviando previsões com consenso...');
       await telegramService.sendLongMessage(message);
       console.log('✅ Previsões enviadas com sucesso!');
 
@@ -64,9 +65,9 @@ async function sendDailyPredictions(timeOfDay = 'morning') {
       for (const match of predictions.slice(0, 5)) {
         statisticsService.recordPrediction({
           match: `${match.homeTeam} vs ${match.awayTeam}`,
-          prediction: match.bestPrediction,
-          confidence: match.confidence,
-          agreement: match.agreementPercentage
+          prediction: match.consensus.prediction,
+          confidence: match.consensus.confidence,
+          sources: Object.values(match.sources).filter(s => s.found).length
         });
       }
     } else {
@@ -101,7 +102,7 @@ async function sendStatisticsReport() {
  * Inicializar bot
  */
 async function initialize() {
-  console.log('🚀 Iniciando Bot de Previsões Consolidadas de Futebol...\n');
+  console.log('🚀 Iniciando Bot de Previsões com Consenso de 3 Fontes...\n');
 
   // Validar ambiente
   validateEnvironment();
@@ -122,48 +123,27 @@ async function initialize() {
   const timezone = process.env.TIMEZONE || 'Europe/Lisbon';
 
   console.log(`\n⏰ Agendando envios diários (${timezone}):`);
+  console.log('   📊 Fontes: API-Football, ESPN, FlashScore');
+  console.log('   🎯 Até 100 jogos por dia');
+  console.log('   🤝 Consenso = Acordo entre múltiplas fontes\n');
 
-  // TESTE: 21:00 hoje (previsões de hoje com RSS Feeds)
-  const now = new Date();
-  const testTime = new Date();
-  testTime.setHours(21, 0, 0, 0);
-  
-  if (now < testTime) {
-    const timeUntilTest = testTime - now;
-    console.log(`   🧪 TESTE: 21:00 - Previsões Reais com RSS Feeds`);
-    setTimeout(async () => {
-      console.log('\n🧪 EXECUTANDO TESTE ÀS 21:00...');
-      try {
-        const predictions = await rssPredictionsProvider.getAllGamesWithPredictions();
-        if (!predictions || predictions.length === 0) {
-          await telegramService.sendMessage('Sem previsões disponíveis');
-        } else {
-          const message = rssPredictionsProvider.formatMessage(predictions);
-          await telegramService.sendLongMessage(message);
-        }
-      } catch (error) {
-        console.error('Erro:', error.message);
-      }
-    }, timeUntilTest);
-  }
-
-  // 7 da manhã - Previsões Profissionais
+  // 7 da manhã - Previsões com Consenso (PRINCIPAL)
   cron.schedule('00 07 * * *', () => sendDailyPredictions('morning'), {
     timezone: timezone
   });
-  console.log('   ✅ 07:00 - Previsões Profissionais');
+  console.log('   ✅ 07:00 - Previsões com Consenso (até 100 jogos)');
 
-  // 12 do meio-dia - Completo
+  // 12 do meio-dia - Previsões com Consenso
   cron.schedule('00 12 * * *', () => sendDailyPredictions('afternoon'), {
     timezone: timezone
   });
-  console.log('   ✅ 12:00 - Previsões Profissionais');
+  console.log('   ✅ 12:00 - Previsões com Consenso');
 
-  // 17 da tarde - Completo
+  // 17 da tarde - Previsões com Consenso
   cron.schedule('00 17 * * *', () => sendDailyPredictions('evening'), {
     timezone: timezone
   });
-  console.log('   ✅ 17:00 - Previsões Profissionais');
+  console.log('   ✅ 17:00 - Previsões com Consenso');
 
   // Relatório de estatísticas - Diariamente às 20h
   cron.schedule('00 20 * * *', sendStatisticsReport, {
